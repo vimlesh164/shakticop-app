@@ -529,10 +529,44 @@ const TRANSLATIONS = {
   }
 };
 
-window.toggleLanguage = function() {
-  currentLang = (currentLang === 'en') ? 'hi' : 'en';
-  localStorage.setItem('shaktiLang', currentLang);
+window.setGlobalLang = function(lang) {
+  currentLang = lang;
+  localStorage.setItem('shaktiLang', lang);
+  // Update translator bar buttons
+  const enBtn = document.getElementById('transEnBtn');
+  const hiBtn = document.getElementById('transHiBtn');
+  if (enBtn) { enBtn.classList.toggle('active', lang === 'en'); }
+  if (hiBtn) { hiBtn.classList.toggle('active', lang === 'hi'); }
+  // Apply instantly (no loading state, no rebuild flash)
   applyLanguage();
+  // Admin/officer panels — translate key labels instantly via data-i18n
+  applyAdminLanguage(lang);
+};
+
+function applyAdminLanguage(lang) {
+  const isHi = lang === 'hi';
+  const adminMap = {
+    'a-stat-label-total': isHi ? 'कुल (सभी मॉड्यूल)' : 'Total (All Modules)',
+    'a-stat-label-pending': isHi ? 'लंबित' : 'Pending',
+    'a-stat-label-complete': isHi ? 'पूर्ण' : 'Complete',
+    'a-stat-label-assigned': isHi ? 'अधिकारी नियुक्त' : 'Officer Assigned',
+    'a-stat-label-rejected': isHi ? 'अस्वीकृत' : 'Rejected',
+    'a-stat-label-rate': isHi ? 'समाधान दर' : 'Resolution Rate'
+  };
+  Object.entries(adminMap).forEach(([id, text]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  });
+  // Translate all elements with data-i18n-admin attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+    const k = el.getAttribute('data-i18n');
+    if (t[k]) el.textContent = t[k];
+  });
+}
+
+window.toggleLanguage = function() {
+  setGlobalLang(currentLang === 'en' ? 'hi' : 'en');
 };
 
 function applyLanguage() {
@@ -565,22 +599,34 @@ function applyLanguage() {
 function buildSidebar() {
   const sidebarLinks = document.getElementById('sidebarLinks');
   if (!sidebarLinks) return;
-  
-  const list = activePublicTab === 'shakti' ? [
-    { id: 'safety', label: 'Safety & Emergency', icon: '🌸' },
-    { id: 'support', label: 'Support & Legal', icon: '💬' },
-    { id: 'empower', label: 'Empowerment & Skills', icon: '🎓' },
-    { id: 'welfare', label: 'Welfare Schemes', icon: '🎀' }
-  ] : [
-    { id: 'fir', label: 'FIR & Complaints', icon: '📄' }
+
+  const shaktiSections = [
+    { id: 'safety', label: currentLang === 'hi' ? 'सुरक्षा और आपातकाल' : 'Safety & Emergency', icon: '🌸', bg: '#fff0f6', count: '6 services', desc: currentLang === 'hi' ? 'SOS, हेल्पलाइन, FIR' : 'SOS, Helplines, FIR' },
+    { id: 'support', label: currentLang === 'hi' ? 'सहायता और कानूनी' : 'Support & Legal', icon: '💬', bg: '#f3f0ff', count: '4 services', desc: currentLang === 'hi' ? 'काउंसलिंग, कानूनी सहायता' : 'Counselling, Legal Aid' },
+    { id: 'welfare', label: currentLang === 'hi' ? 'कल्याण योजनाएं' : 'Welfare Schemes', icon: '🎀', bg: '#fff0f6', count: '5 services', desc: currentLang === 'hi' ? 'सरकारी लाभ, पेंशन' : 'Gov Benefits, Pension' }
   ];
-  
+  const policeSections = [
+    { id: 'police_services', label: currentLang === 'hi' ? 'पुलिस सेवाएं' : 'Police Services', icon: '👮', bg: '#eef2ff', count: '10 services', desc: currentLang === 'hi' ? 'FIR, शिकायत, सत्यापन' : 'FIR, Complaint, Verify' }
+  ];
+
+  const list = activePublicTab === 'shakti' ? shaktiSections : policeSections;
+
   sidebarLinks.innerHTML = list.map(item => `
-    <a href="#section-${item.id}" class="sidebar-link" onclick="scrollToSection('section-${item.id}');return false;">
-      <span>${item.icon}</span> ${item.label}
+    <a href="#section-${item.id}" class="sidebar-nav-item" onclick="setSidebarActive(this); scrollToSection('section-${item.id}');return false;">
+      <div class="sidebar-nav-icon" style="background:${item.bg};">${item.icon}</div>
+      <div class="sidebar-nav-info">
+        <div class="sidebar-nav-label">${item.label}</div>
+        <div class="sidebar-nav-count">${item.count} · ${item.desc}</div>
+      </div>
+      <div class="sidebar-nav-arrow">›</div>
     </a>
   `).join('');
 }
+
+window.setSidebarActive = function(el) {
+  document.querySelectorAll('.sidebar-nav-item').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+};
 
 window.switchTab = function(tab) {
   activePublicTab = tab;
@@ -649,14 +695,9 @@ function buildContent() {
       id: 'support', label: 'Support & Legal Services', icon: '💬', accent: '#5f3dc4', iconBg: '#f3f0ff',
       items: [
         { name: 'Counselling Support', tag: 'Confidential', desc: 'Free counselling with licensed psychological experts.', action: "openModal('modalCounsel')", icon: '💬' },
-        { name: 'Legal Aid Referral', tag: 'Free Assistance', desc: 'Referral for free lawyers on domestic acts and safety rules.', action: "openModal('modalLegalAid')", icon: '⚖️' }
-      ]
-    },
-    {
-      id: 'empower', label: 'Empowerment & Skills', icon: '🎓', accent: '#0ea5e9', iconBg: '#e0f2fe',
-      items: [
-        { name: 'Jan Shikshan Sansthan', tag: 'Vocational training', desc: 'Free skills training and certifications for women.', action: "openEmpowerApplyModal('Jan Shikshan Sansthan')", icon: '🏫' },
-        { name: 'Self Defence Training', tag: 'Workshops', desc: 'Free safety workshops and certification from police.', action: "openEmpowerApplyModal('Self Defence Training')", icon: '🥋' }
+        { name: 'Legal Aid Referral', tag: 'Free Assistance', desc: 'Referral for free lawyers on domestic acts and safety rules.', action: "openModal('modalLegalAid')", icon: '⚖️' },
+        { name: 'Jan Shikshan Sansthan', tag: 'Vocational Training', desc: 'Free skills training and certifications for women.', action: "openEmpowerApplyModal('Jan Shikshan Sansthan')", icon: '🏫', oblique: true },
+        { name: 'Self Defence Training', tag: 'Workshops', desc: 'Free safety workshops and self-defence certification.', action: "openEmpowerApplyModal('Self Defence Training')", icon: '🥋', oblique: true }
       ]
     },
     {
@@ -665,7 +706,8 @@ function buildContent() {
         { name: 'Kanya Sumangala Yojana', tag: 'Financial Aid', desc: 'Direct benefit transfer for girl child education & health.', url: 'https://mksy.up.gov.in', target: '_blank', icon: '👶' },
         { name: 'Shadi Anudan Yojana', tag: 'Marriage Grant', desc: 'Financial assistance for marriages of daughters from poor families.', url: 'https://shadianudan.upsdc.gov.in', target: '_blank', icon: '💍' },
         { name: 'Vidhwa Pension Scheme', tag: 'Widow Pension', desc: 'Social security and pension for destitute widows in UP.', url: 'https://sspy-up.gov.in', target: '_blank', icon: '👵' },
-        { name: 'Sakhi One Stop Centre', tag: 'Support Centre', desc: 'Integrated support services for women affected by violence.', url: 'https://missionshakti.up.gov.in', target: '_blank', icon: '🏢' }
+        { name: 'Rani Laxmi Bai Mahila Evam Bal Samman Kosh', tag: 'Financial Help', desc: 'Financial aid for women & children in distress — education, marriage & medical support.', url: 'https://msk.upsdc.gov.in/financialhelp/Default.aspx?help=Edu', target: '_blank', icon: '🏅' },
+        { name: 'UP Scholarship Scheme', tag: 'Education Aid', desc: 'Pre & post matric scholarships for students of all categories across UP.', url: 'https://scholarship.up.gov.in/', target: '_blank', icon: '🎓' }
       ]
     }
   ] : [
@@ -699,8 +741,10 @@ function buildContent() {
             ? (item.target === '_blank' ? `window.open('${item.url}', '_blank', 'noopener,noreferrer')` : `window.location.href='${item.url}'`) 
             : item.action;
           const linkText = item.target === '_blank' ? 'Open Portal' : 'Proceed';
+          const obliqueBanner = '';
           return `
-            <div class="svc-card" onclick="${clickHandler}" style="--card-accent: ${cat.accent}; --card-icon-bg: ${cat.iconBg}; --card-tag-bg: ${cat.iconBg}; --card-tag-color: ${cat.accent};">
+            <div class="svc-card" onclick="${clickHandler}" style="--card-accent: ${cat.accent}; --card-icon-bg: ${cat.iconBg}; --card-tag-bg: ${cat.iconBg}; --card-tag-color: ${cat.accent}; position:relative; overflow:hidden;">
+              ${obliqueBanner}
               <div class="svc-card-top">
                 <div class="svc-card-icon">${item.icon}</div>
                 <span class="svc-tag">${item.tag}</span>
@@ -1036,6 +1080,8 @@ function postLoginAction() {
     switchAdminTab('dash');
     applySavedAdminAppearance();
     loadAdminProfileDisplay();
+    startAdminLiveClock();
+    updateTopbarQuickStats();
     fetchAdminNotifications();
     subscribeRealtimeEventsAdmin();
   } else if (currentSessionUser.role === 'officer') {
@@ -1056,6 +1102,11 @@ function postLoginAction() {
     subscribeRealtimeEventsUser();
     // Refresh notifications for logged-in citizen
     setTimeout(fetchUserNotifications, 500);
+    // Restore any active travel journeys and SOS button
+    const activeJ = getActiveJourneys().filter(j => j.userEmail === currentSessionUser.email);
+    activeJ.forEach(j => startTravelAutoCloseTimer(j.id, j.createdAt));
+    checkTravelSOSFloat();
+    setTimeout(renderActiveTravelCards, 300);
 
     // Warm the citizen profile cache so complaint autofill and the gate work immediately
     (async () => {
@@ -1291,8 +1342,9 @@ window.doLogout = function() {
   
   const userBadge = document.getElementById('userBadge');
   if (userBadge) userBadge.style.display = 'none';
+  if (adminClockInterval) { clearInterval(adminClockInterval); adminClockInterval = null; }
   const bellWrap = document.getElementById('notifBellWrap');
-  if (bellWrap) { bellWrap.style.display = 'none'; document.getElementById('notifPopup').style.display = 'none'; }
+  if (bellWrap) { bellWrap.style.display = 'none'; const p = document.getElementById('notifPopup'); if(p) p.style.display = 'none'; }
   updateMobileUserChrome();
   
   const navDash = document.getElementById('nav-dashboard');
@@ -1572,6 +1624,35 @@ window.submitComplaintForm = async function() {
 };
 
 // Form submit: Mahila Help Desk Call assistance
+window.switchHdVictimType = function(type) {
+  const selfBtn = document.getElementById('hdSelfBtn');
+  const otherBtn = document.getElementById('hdOtherBtn');
+  const otherNote = document.getElementById('hdOtherNote');
+  if (selfBtn) selfBtn.classList.toggle('active', type === 'self');
+  if (otherBtn) otherBtn.classList.toggle('active', type === 'other');
+  if (otherNote) otherNote.style.display = type === 'other' ? 'block' : 'none';
+  if (type === 'self' && currentSessionUser) {
+    const profile = getStoredCitizenProfile(currentSessionUser.email);
+    if (profile) {
+      const nameEl = document.getElementById('hd-name');
+      const phoneEl = document.getElementById('hd-phone');
+      const districtEl = document.getElementById('hd-district');
+      if (nameEl && profile.full_name) nameEl.value = profile.full_name;
+      if (phoneEl && profile.mobile) phoneEl.value = profile.mobile;
+      if (districtEl && profile.district) {
+        districtEl.value = profile.district;
+        window.populateHelpDeskStations(profile.district);
+        setTimeout(() => {
+          const stationEl = document.getElementById('hd-station');
+          if (stationEl && profile.police_station) stationEl.value = profile.police_station;
+        }, 50);
+      }
+    }
+  } else if (type === 'other') {
+    ['hd-name','hd-phone'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  }
+};
+
 window.addMhdQuickChip = function(text) {
   const field = document.getElementById('hd-desc');
   if (!field) return;
@@ -1852,6 +1933,150 @@ window.submitLegalForm = async function() {
   if (currentSessionUser) fetchUserDashboardData();
 };
 
+// ==========================================
+// SAFE TRAVEL MONITOR — Full SOS System
+// ==========================================
+const ACTIVE_TRAVEL_KEY = 'shakti_active_travel_journeys';
+let travelAutoCloseTimers = {};
+
+function getActiveJourneys() {
+  try { return JSON.parse(localStorage.getItem(ACTIVE_TRAVEL_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveActiveJourneys(list) { localStorage.setItem(ACTIVE_TRAVEL_KEY, JSON.stringify(list)); }
+
+function startTravelAutoCloseTimer(journeyId, createdAt) {
+  if (travelAutoCloseTimers[journeyId]) clearTimeout(travelAutoCloseTimers[journeyId]);
+  const created = new Date(createdAt).getTime();
+  const twoHours = 2 * 60 * 60 * 1000;
+  const remaining = twoHours - (Date.now() - created);
+  if (remaining <= 0) { autoCloseTravelJourney(journeyId); return; }
+  travelAutoCloseTimers[journeyId] = setTimeout(() => autoCloseTravelJourney(journeyId), remaining);
+}
+
+async function autoCloseTravelJourney(journeyId) {
+  const journeys = getActiveJourneys().filter(j => j.id !== journeyId);
+  saveActiveJourneys(journeys);
+  if (isSupabaseConfigured) {
+    await supabase.from('emergency_requests').update({ status: 'Auto Closed — No SOS' }).eq('id', journeyId).eq('status', 'Submitted');
+  }
+  showToast(`Journey ${journeyId} auto-closed (2 hours, no action required).`, 'info');
+  renderActiveTravelCards();
+  checkTravelSOSFloat();
+}
+
+function checkTravelSOSFloat() {
+  const journeys = getActiveJourneys().filter(j => j.userEmail === (currentSessionUser?.email));
+  const floatBtn = document.getElementById('travelSOSFloat');
+  const journeyIdLabel = document.getElementById('travelSOSJourneyId');
+  if (floatBtn) floatBtn.style.display = journeys.length > 0 ? 'block' : 'none';
+  if (journeyIdLabel && journeys.length > 0) journeyIdLabel.textContent = journeys[0].id;
+}
+
+function renderActiveTravelCards() {
+  const container = document.getElementById('activeTravelCardsContainer');
+  if (!container) return;
+  const journeys = getActiveJourneys().filter(j => j.userEmail === (currentSessionUser?.email));
+  if (journeys.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = journeys.map(j => {
+    const created = new Date(j.createdAt);
+    const elapsed = Math.floor((Date.now() - created.getTime()) / 60000);
+    const remaining = Math.max(0, 120 - elapsed);
+    return `
+    <div class="active-travel-card">
+      <div class="active-travel-header">
+        <div class="active-travel-id">🛡️ ${j.id}</div>
+        <div class="active-travel-status">🟢 MONITORING</div>
+      </div>
+      <div class="active-travel-details">
+        🚗 ${j.transport} · ${j.plate}<br>
+        📍 ${j.start} → ${j.end}<br>
+        🏙️ ${j.district}
+      </div>
+      <div class="active-travel-timer">⏱️ Auto-closes in ${remaining} minutes if no SOS pressed</div>
+      <div class="active-travel-sos-row">
+        <button class="active-travel-sos-btn" onclick="triggerTravelSOS('${j.id}')">🆘 SOS — I AM UNSAFE</button>
+        <button class="active-travel-close-btn" onclick="closeTravelJourneyManual('${j.id}')">✅ Journey Complete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.triggerTravelSOS = async function(journeyId) {
+  const journeys = getActiveJourneys();
+  const journey = journeyId ? journeys.find(j => j.id === journeyId) : journeys.find(j => j.userEmail === currentSessionUser?.email);
+  if (!journey) { showToast('No active journey found.', 'warning'); return; }
+
+  showToast('🚨 SOS ALERT SENT! Police are being notified. Stay on the line.', 'error');
+
+  // Capture live location for SOS
+  const getSOSLocation = () => new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(''); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve(`[GPS: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} - Map: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}]`),
+      () => resolve(''),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+
+  const liveLocation = await getSOSLocation();
+  const sosDesc = `🚨 SOS DISTRESS SIGNAL from Safe Travel Monitor!\n\nJourney: ${journey.id}\nCitizen: ${journey.name} (${journey.mobile})\nVehicle: ${journey.transport} · ${journey.plate}\nRoute: ${journey.start} → ${journey.end}\n\n${liveLocation ? `Live Location: ${liveLocation}` : 'Live GPS unavailable — last known start: ' + journey.start}`;
+
+  const sosRecord = {
+    id: '', name: journey.name, mobile: journey.mobile,
+    email: journey.userEmail || '',
+    district: journey.district,
+    location: liveLocation || `Start: ${journey.start}`,
+    type: 'Safe Travel SOS 🚨',
+    description: sosDesc,
+    status: 'SOS ACTIVE',
+    created_at: new Date().toISOString()
+  };
+
+  if (isSupabaseConfigured) {
+    await supabase.from('emergency_requests').insert(sosRecord);
+    await supabase.from('emergency_requests').update({ status: 'SOS Triggered' }).eq('id', journey.id);
+  } else {
+    const sosId = 'SOS-2026-' + String(900 + Math.floor(Math.random()*99)).padStart(6,'0');
+    sosRecord.id = sosId;
+    const list = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS)||'[]');
+    list.push(sosRecord);
+    localStorage.setItem(MOCK_EMERGENCY_REQUESTS, JSON.stringify(list));
+    const journeyList = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS)||'[]');
+    const idx = journeyList.findIndex(r => r.id === journey.id);
+    if (idx !== -1) { journeyList[idx].status = 'SOS Triggered'; localStorage.setItem(MOCK_EMERGENCY_REQUESTS, JSON.stringify(journeyList)); }
+  }
+
+  // Update local active journey status
+  const updated = getActiveJourneys().map(j => j.id === journey.id ? { ...j, sosTriggered: true } : j);
+  saveActiveJourneys(updated);
+  renderActiveTravelCards();
+
+  // Notify admin via admin notifications
+  if (isSupabaseConfigured) {
+    await supabase.from('notifications').insert({
+      user_email: 'admin',
+      title: `🚨 SOS from Safe Travel: ${journey.name}`,
+      message: `${journey.transport} · ${journey.plate} | Route: ${journey.start} → ${journey.end} | ${liveLocation ? 'Live GPS sent' : 'No GPS'}`
+    });
+  }
+};
+
+window.closeTravelJourneyManual = async function(journeyId) {
+  if (!confirm('Journey complete ho gayi? Monitoring band ho jayegi.')) return;
+  const journeys = getActiveJourneys().filter(j => j.id !== journeyId);
+  saveActiveJourneys(journeys);
+  if (isSupabaseConfigured) {
+    await supabase.from('emergency_requests').update({ status: 'Journey Complete' }).eq('id', journeyId);
+  } else {
+    const list = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS)||'[]');
+    const idx = list.findIndex(r => r.id === journeyId);
+    if (idx !== -1) { list[idx].status = 'Journey Complete'; localStorage.setItem(MOCK_EMERGENCY_REQUESTS, JSON.stringify(list)); }
+  }
+  showToast('Journey successfully marked complete. Stay safe!', 'success');
+  renderActiveTravelCards();
+  checkTravelSOSFloat();
+};
+
 // Form submit: Safe Travel Monitor
 window.submitTravelForm = async function() {
   const name = document.getElementById('tr-name').value.trim();
@@ -1870,29 +2095,41 @@ window.submitTravelForm = async function() {
   
   let recordId = '';
   const desc = `Safe Travel monitored: Route ${start} to ${end} in ${transport} (${plate}).`;
+  const createdAt = new Date().toISOString();
+
   if (isSupabaseConfigured) {
     const { data, error } = await supabase.from('emergency_requests').insert({
-      name, mobile, email, district, location: start, type: 'Safe Travel Mode', remarks: desc
+      name, mobile, email, district, location: start, type: 'Safe Travel Mode', description: desc, remarks: desc, status: 'Submitted', created_at: createdAt
     }).select('id').single();
-    if (error) {
-      showToast(`Safe Travel mode start failed: ${error.message}`, 'error');
-      return;
-    }
+    if (error) { showToast(`Safe Travel mode start failed: ${error.message}`, 'error'); return; }
     recordId = data.id;
   } else {
     recordId = 'SOS-2026-' + lpad(Math.floor(101 + Math.random()*900).toString(), 6, '0');
     const list = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS) || '[]');
-    list.push({
-      id: recordId, name, mobile, email, district, location: start, type: 'Safe Travel Mode', remarks: desc, status: 'Submitted', created_at: new Date().toISOString()
-    });
+    list.push({ id: recordId, name, mobile, email, district, location: start, type: 'Safe Travel Mode', description: desc, remarks: desc, status: 'Submitted', created_at: createdAt });
     localStorage.setItem(MOCK_EMERGENCY_REQUESTS, JSON.stringify(list));
   }
-  
-  await insertHistoryLog(recordId, 'Submitted', null, 'Safe Travel GPS monitoring activated.', email);
-  showToast(`SAFE JOURNEY TRACKER RUNNING. Reference ID: ${recordId}`, 'success');
+
+  // Save to local active journeys list
+  const activeJourneys = getActiveJourneys();
+  activeJourneys.push({ id: recordId, name, mobile, userEmail: email, district, transport, plate, start, end, createdAt, sosTriggered: false });
+  saveActiveJourneys(activeJourneys);
+
+  // Start auto-close timer (2 hours)
+  startTravelAutoCloseTimer(recordId, createdAt);
+
+  await insertHistoryLog(recordId, 'Submitted', null, 'Safe Travel GPS monitoring activated. SOS available on dashboard.', email);
+  showToast(`✅ Journey Monitor Started! ID: ${recordId} — SOS button is now on your dashboard.`, 'success');
   closeModal('modalTravel');
   document.getElementById('travelForm').reset();
-  if (currentSessionUser) fetchUserDashboardData();
+
+  // Show floating SOS button + active travel card
+  checkTravelSOSFloat();
+  if (currentSessionUser) {
+    switchTab('dashboard');
+    fetchUserDashboardData();
+    setTimeout(renderActiveTravelCards, 100);
+  }
 };
 
 
@@ -2383,17 +2620,18 @@ window.switchAdminTab = function(tabName) {
     officers: '👮 Female Officers Database',
     counsellors: '👤 Counsellors Directory',
     emergency: '🚨 Emergency SOS Distress Alerts',
-    contacts: '📞 Public Helplines Cards',
-    logs: '📜 System Audit Trail',
-    analytics: '📈 Chart.js Statistics Graphs',
-    reports: '📄 Master Reports Registry & Exports',
+    travel: '🛡️ Safe Travel Monitor — Live Journeys',
     settings: '⚙️ Appearance & Preferences'
   };
   document.getElementById('adminActiveTabTitle').textContent = titles[tabName] || 'Admin Panel';
   
   // Trigger specific tab fetches (Lazy Loading)
   if (tabName === 'dash') renderGeneralDashboardOverview();
-  if (tabName === 'complaints') fetchComplaintsAdmin();
+  if (tabName === 'complaints') {
+    const catSel = document.getElementById('compFilterCategory');
+    if (catSel) delete catSel.dataset.populated;
+    fetchComplaintsAdmin();
+  }
   if (tabName === 'ars') fetchARSAdmin();
   if (tabName === 'mhd') fetchMHDAdmin();
   if (tabName === 'counsel') fetchCNSAdmin();
@@ -2401,10 +2639,7 @@ window.switchAdminTab = function(tabName) {
   if (tabName === 'officers') fetchOfficersAdmin();
   if (tabName === 'counsellors') fetchCounsellorsAdmin();
   if (tabName === 'emergency') fetchEmergencySOSAdmin();
-  if (tabName === 'contacts') fetchContactsAdmin();
-  if (tabName === 'logs') fetchLogsAdmin();
-  if (tabName === 'analytics') initAnalyticsCharts();
-  if (tabName === 'reports') runReportsQuery();
+  if (tabName === 'travel') fetchTravelMonitorAdmin();
   if (tabName === 'settings') initSettingsPanel();
 };
 
@@ -2585,6 +2820,104 @@ const ADMIN_PASSWORD_OVERRIDE_KEY = 'shakti_admin_password_override';
 function getSavedAdminProfile() {
   try { return JSON.parse(localStorage.getItem(ADMIN_PROFILE_KEY) || 'null'); } catch (e) { return null; }
 }
+
+// ==========================================
+// ADMIN TOPBAR — Live Clock + Quick Stats + Search
+// ==========================================
+let adminClockInterval = null;
+
+function startAdminLiveClock() {
+  if (adminClockInterval) clearInterval(adminClockInterval);
+  const clockEl = document.getElementById('adminLiveClock');
+  const dateEl = document.getElementById('adminLiveDate');
+  const tick = () => {
+    const now = new Date();
+    if (clockEl) clockEl.textContent = now.toLocaleTimeString('en-IN', { hour12: false });
+    if (dateEl) {
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      dateEl.textContent = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+    }
+  };
+  tick();
+  adminClockInterval = setInterval(tick, 1000);
+}
+
+async function updateTopbarQuickStats() {
+  let pending = 0, sos = 0;
+  if (isSupabaseConfigured) {
+    const [{ count: p }, { count: s }] = await Promise.all([
+      supabase.from('complaints').select('*', { count:'exact', head:true }).eq('status','Pending'),
+      supabase.from('emergency_requests').select('*', { count:'exact', head:true }).not('status','eq','Resolved')
+    ]);
+    pending = p || 0; sos = s || 0;
+  } else {
+    pending = JSON.parse(localStorage.getItem(MOCK_COMPLAINTS)||'[]').filter(r => r.status === 'Pending').length;
+    sos = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS)||'[]').filter(r => r.status !== 'Resolved').length;
+  }
+  const pEl = document.getElementById('topbarPending');
+  const sEl = document.getElementById('topbarSOS');
+  if (pEl) pEl.textContent = pending;
+  if (sEl) sEl.textContent = sos;
+}
+
+window.handleAdminGlobalSearch = async function(query) {
+  const wrap = document.getElementById('adminGlobalSearchWrap') || document.querySelector('.admin-topbar-search-wrap');
+  let dropdown = document.getElementById('adminSearchDropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'adminSearchDropdown';
+    dropdown.className = 'admin-search-dropdown';
+    wrap.appendChild(dropdown);
+  }
+  query = (query||'').trim().toLowerCase();
+  if (!query || query.length < 2) { dropdown.classList.remove('open'); return; }
+  dropdown.classList.add('open');
+  dropdown.innerHTML = '<div class="admin-search-no-result">Searching...</div>';
+
+  let results = [];
+  const modules = [
+    { key: MOCK_COMPLAINTS, label: 'Complaint', tab: 'complaints' },
+    { key: MOCK_ARS_REPORTS, label: 'Anti-Romeo', tab: 'ars' },
+    { key: MOCK_MHD_REQUESTS, label: 'Help Desk', tab: 'mhd' },
+    { key: MOCK_EMERGENCY_REQUESTS, label: 'SOS', tab: 'emergency' }
+  ];
+
+  if (isSupabaseConfigured) {
+    const searches = await Promise.all(modules.map(m =>
+      supabase.from(m.key.replace('mock_','')).select('id, name, mobile, status').or(`id.ilike.%${query}%,name.ilike.%${query}%,mobile.ilike.%${query}%`).limit(4)
+    ));
+    searches.forEach((res, i) => (res.data||[]).forEach(r => results.push({ ...r, _m: modules[i] })));
+  } else {
+    modules.forEach(m => {
+      JSON.parse(localStorage.getItem(m.key)||'[]')
+        .filter(r => (r.id||'').toLowerCase().includes(query) || (r.name||'').toLowerCase().includes(query) || (r.mobile||'').includes(query))
+        .slice(0,3).forEach(r => results.push({ ...r, _m: m }));
+    });
+  }
+
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div class="admin-search-no-result">No results found for "'+query+'"</div>';
+    return;
+  }
+
+  dropdown.innerHTML = results.slice(0,10).map(r => `
+    <div class="admin-search-result-item" onclick="switchAdminTab('${r._m.tab}'); document.getElementById('adminGlobalSearch').value=''; document.getElementById('adminSearchDropdown').classList.remove('open');">
+      <span class="admin-search-result-badge">${r._m.label}</span>
+      <div>
+        <div class="admin-search-result-id">${r.id}</div>
+        <div class="admin-search-result-meta">${r.name||'—'} · ${r.mobile||'—'} · <span style="color:${r.status==='Pending'?'#f59e0b':r.status==='Resolved'?'#16a34a':'#64748b'}">${r.status||'Submitted'}</span></div>
+      </div>
+    </div>
+  `).join('');
+};
+
+// Close search dropdown on outside click
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('adminSearchDropdown');
+  const searchWrap = document.querySelector('.admin-topbar-search-wrap');
+  if (dropdown && searchWrap && !searchWrap.contains(e.target)) dropdown.classList.remove('open');
+});
 
 function loadAdminProfileDisplay() {
   const saved = getSavedAdminProfile();
@@ -2865,201 +3198,220 @@ async function renderGeneralDashboardOverview() {
 
   // Render the combined status breakdown chart with distinct colors
   const chartCanvas = document.getElementById('complaintStatusChart');
+  const legendBox = document.getElementById('chartLegendBox');
   if (chartCanvas && typeof Chart !== 'undefined') {
+    const chartColors = ['#f59e0b', '#4f46e5', '#16a34a', '#dc2626'];
+    const chartLabels = ['Pending', 'Officer Assigned', 'Resolved', 'Rejected'];
+    const chartValues = [pending, assigned, complete, rejected];
     const chartData = {
-      labels: ['Pending', 'Officer Assigned / Investigation', 'Resolved', 'Rejected'],
-      datasets: [{
-        data: [pending, assigned, complete, rejected],
-        backgroundColor: ['#f59e0b', '#4f46e5', '#16a34a', '#dc2626'],
-        borderWidth: 0
-      }]
+      labels: chartLabels,
+      datasets: [{ data: chartValues, backgroundColor: chartColors, borderWidth: 0, hoverOffset: 6 }]
     };
     if (complaintStatusChartInstance) complaintStatusChartInstance.destroy();
     complaintStatusChartInstance = new Chart(chartCanvas.getContext('2d'), {
       type: 'doughnut',
       data: chartData,
-      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+      options: { responsive: true, cutout: '68%', plugins: { legend: { display: false } } }
     });
+    if (legendBox) {
+      legendBox.innerHTML = chartLabels.map((label, i) => `
+        <div class="chart-legend-item">
+          <div class="chart-legend-dot" style="background:${chartColors[i]};"></div>
+          <div class="chart-legend-label">${label}</div>
+          <div class="chart-legend-count">${chartValues[i]}</div>
+        </div>
+      `).join('');
+    }
   }
 
   // Render critical alerts & dispatch list
   renderCriticalDashboardWidgets();
+  updateTopbarQuickStats();
 }
 
 async function renderCriticalDashboardWidgets() {
-  const table = document.getElementById('adminRecentIncidentsList');
-  const patrolList = document.getElementById('adminPatrolStatusList');
-  if (!table || !patrolList) return;
-  
-  let recent = [];
+  const recentBody = document.getElementById('dashRecentComplaintsBody');
+  const officersBody = document.getElementById('dashAvailableOfficersBody');
+  if (!recentBody || !officersBody) return;
+
+  let recentComplaints = [];
   let officers = [];
-  
+
   if (isSupabaseConfigured) {
-    const { data: ars } = await supabase.from('ars_reports').select('id, location, status, created_at').order('created_at', { ascending: false }).limit(3);
-    const { data: sos } = await supabase.from('emergency_requests').select('id, location, status, created_at').order('created_at', { ascending: false }).limit(3);
-    recent = [...(ars || []), ...(sos || [])].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
-    
-    const { data: off } = await supabase.from('officers').select('*').eq('type', 'police').limit(4);
+    const { data: comp } = await supabase.from('complaints').select('id, name, category, status, created_at').order('created_at', { ascending: false }).limit(8);
+    recentComplaints = comp || [];
+    const { data: off } = await supabase.from('officers').select('*').eq('availability', true).limit(6);
     officers = off || [];
   } else {
-    const a = JSON.parse(localStorage.getItem(MOCK_ARS_REPORTS) || '[]');
-    const b = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS) || '[]');
-    recent = [...a, ...b].sort((x,y) => new Date(y.created_at) - new Date(x.created_at)).slice(0, 5);
-    
-    officers = JSON.parse(localStorage.getItem(MOCK_OFFICERS) || '[]').filter(o => o.type === 'police').slice(0, 4);
+    recentComplaints = JSON.parse(localStorage.getItem(MOCK_COMPLAINTS) || '[]')
+      .sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0)).slice(0, 8);
+    officers = JSON.parse(localStorage.getItem(MOCK_OFFICERS) || '[]')
+      .filter(o => o.availability !== false).slice(0, 6);
   }
-  
-  table.innerHTML = recent.map(r => `
-    <tr>
-      <td><strong>${r.id}</strong></td>
-      <td>${r.id.startsWith('ARS') ? 'Anti-Romeo' : 'SOS Emergency'}</td>
-      <td>${r.location}</td>
-      <td><span class="admin-badge ${getStatusClass(r.status)}">${r.status}</span></td>
-      <td>${new Date(r.created_at || new Date()).toLocaleTimeString()}</td>
-    </tr>
-  `).join('');
-  
-  patrolList.innerHTML = officers.map(o => `
-    <div style="background:#111c44; border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
-      <div style="display:flex; gap:10px; align-items:center;">
-        <div style="width:34px; height:34px; border-radius:50%; background:#1e293b; overflow:hidden;">
-          <img src="${o.photo_url || 'https://via.placeholder.com/50'}" style="width:100%; height:100%; object-fit:cover;"/>
-        </div>
-        <div>
-          <div style="color:#fff; font-weight:600; font-size:12px;">${o.name}</div>
-          <div style="color:#a3b1cc; font-size:10px;">${o.station} (${o.district})</div>
-        </div>
-      </div>
-      <span class="admin-badge status-pending" style="background:${o.availability ? '#10b981' : '#ef4444'}1A; color:${o.availability ? '#10b981' : '#ef4444'};">
-        ${o.availability ? 'Available' : 'On Dispatch'}
-      </span>
-    </div>
-  `).join('');
+
+  // Render recent complaints
+  recentBody.innerHTML = recentComplaints.length === 0
+    ? '<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No complaints filed yet.</td></tr>'
+    : recentComplaints.map(r => `
+      <tr>
+        <td><strong>${r.id}</strong></td>
+        <td>${r.name || '—'}</td>
+        <td>${r.category || 'Standard'}</td>
+        <td><span class="admin-badge ${getStatusClass(r.status || 'Pending')}">${r.status || 'Pending'}</span></td>
+        <td>${new Date(r.created_at || new Date()).toLocaleDateString()}</td>
+      </tr>`).join('');
+
+  // Render available officers
+  officersBody.innerHTML = officers.length === 0
+    ? '<tr><td colspan="4" style="text-align:center; padding:16px; color:#94a3b8;">No officers registered yet.</td></tr>'
+    : officers.map(o => `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#0f766e,#0d9488); display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff; overflow:hidden; flex-shrink:0;">
+              ${o.photo_url ? `<img src="${o.photo_url}" style="width:100%; height:100%; object-fit:cover;">` : '👮'}
+            </div>
+            <span style="font-weight:700; font-size:12px;">${o.name}</span>
+          </div>
+        </td>
+        <td>${o.designation || '—'}</td>
+        <td>${o.station || o.district || '—'}</td>
+        <td><span class="admin-badge" style="background:#d1fae5; color:#065f46; font-size:9.5px;">✅ Available</span></td>
+      </tr>`).join('');
 }
 
 // Anti Romeo Squad Manager
 // Complaints Registry Manager (citizen-filed complaints, incl. Voice FIR)
+const ADMIN_REGISTRY_MODULES = [
+  { table: 'complaints',             key: 'mock_complaints',              label: '📝 Complaint',    prefix: 'SC'  },
+  { table: 'ars_reports',            key: 'mock_ars_reports',             label: '🚔 Anti-Romeo',   prefix: 'ARS' },
+  { table: 'mhd_requests',           key: 'mock_mhd_requests',            label: '👮 Help Desk',    prefix: 'MHD' },
+  { table: 'counselling_bookings',   key: 'mock_counselling_bookings',    label: '💬 Counselling',  prefix: 'CNS' },
+  { table: 'emergency_requests',     key: 'mock_emergency_requests',      label: '🆘 SOS',          prefix: 'SOS' },
+  { table: 'empowerment_applications', key: 'mock_empowerment_applications', label: '💪 JSS',       prefix: 'SCH' },
+  { table: 'callback_requests',      key: 'mock_callback_requests',       label: '📞 Legal Aid',    prefix: 'FOB' }
+];
+
 window.fetchComplaintsAdmin = async function() {
   const tbody = document.getElementById('complaintsTableBody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;"><div class="skeleton" style="height:35px; width:100%;"></div></td></tr>';
-  const query = document.getElementById('compSearchQuery').value.trim().toLowerCase();
-  const status = document.getElementById('compFilterStatus').value;
-  const category = document.getElementById('compFilterCategory').value;
-  const station = document.getElementById('compFilterStation').value;
-  const officerId = document.getElementById('compFilterOfficer').value;
-  const dateFrom = document.getElementById('compFilterDateFrom').value;
-  const dateTo = document.getElementById('compFilterDateTo').value;
-  const sortBy = document.getElementById('compSortBy').value;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:16px;"><div class="skeleton" style="height:35px; width:100%;"></div></td></tr>';
 
-  let list = [];
-  let officersMap = {};
+  const query    = (document.getElementById('compSearchQuery')?.value || '').trim().toLowerCase();
+  const status   = document.getElementById('compFilterStatus')?.value || '';
+  const category = document.getElementById('compFilterCategory')?.value || '';
+  const station  = document.getElementById('compFilterStation')?.value || '';
+  const dateFrom = document.getElementById('compFilterDateFrom')?.value || '';
+  const dateTo   = document.getElementById('compFilterDateTo')?.value || '';
+  const sortBy   = document.getElementById('compSortBy')?.value || 'date_desc';
+
+  // Determine which modules to fetch (filter by category prefix if selected)
+  const modulesToFetch = category
+    ? ADMIN_REGISTRY_MODULES.filter(m => m.table === category)
+    : ADMIN_REGISTRY_MODULES;
+
+  let allRecords = [];
+
   if (isSupabaseConfigured) {
-    const { data } = await supabase.from('complaints').select('*, assigned_officer_id(id, name)').order('created_at', { ascending: false });
-    list = data || [];
+    const results = await Promise.all(modulesToFetch.map(m =>
+      supabase.from(m.table).select('*').order('created_at', { ascending: false })
+    ));
+    results.forEach((res, i) => {
+      (res.data || []).forEach(r => allRecords.push({ ...r, _module: modulesToFetch[i] }));
+    });
   } else {
-    list = JSON.parse(localStorage.getItem(MOCK_COMPLAINTS) || '[]');
-    const officers = JSON.parse(localStorage.getItem(MOCK_OFFICERS) || '[]');
-    officers.forEach(o => officersMap[o.id] = o.name);
+    modulesToFetch.forEach(m => {
+      const list = JSON.parse(localStorage.getItem(m.key) || '[]');
+      list.forEach(r => allRecords.push({ ...r, _module: m }));
+    });
   }
 
-  // Populate filter dropdowns dynamically from the full dataset
-  populateComplaintFilterDropdowns(list, officersMap);
+  // Populate filter dropdowns only once
+  populateComplaintFilterDropdowns(allRecords);
 
-  if (status) list = list.filter(r => r.status === status);
-  if (category) list = list.filter(r => r.category === category);
-  if (station) list = list.filter(r => r.police_station === station);
-  if (officerId) list = list.filter(r => (r.assigned_officer_id && (r.assigned_officer_id.id || r.assigned_officer_id)) === officerId);
-  if (dateFrom) list = list.filter(r => new Date(r.created_at || 0) >= new Date(dateFrom));
-  if (dateTo) list = list.filter(r => new Date(r.created_at || 0) <= new Date(dateTo + 'T23:59:59'));
+  // Apply filters
+  if (status)   allRecords = allRecords.filter(r => r.status === status);
+  if (station)  allRecords = allRecords.filter(r => (r.police_station || r.station || '') === station);
+  if (dateFrom) allRecords = allRecords.filter(r => new Date(r.created_at || 0) >= new Date(dateFrom));
+  if (dateTo)   allRecords = allRecords.filter(r => new Date(r.created_at || 0) <= new Date(dateTo + 'T23:59:59'));
   if (query) {
-    list = list.filter(r =>
+    allRecords = allRecords.filter(r =>
       (r.id || '').toLowerCase().includes(query) ||
       (r.name || '').toLowerCase().includes(query) ||
-      (r.district || '').toLowerCase().includes(query)
+      (r.district || '').toLowerCase().includes(query) ||
+      (r.mobile || '').includes(query)
     );
   }
 
-  if (sortBy === 'date_asc') list.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-  else if (sortBy === 'category') list.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
-  else if (sortBy === 'status') list.sort((a, b) => (a.status || '').localeCompare(b.status || ''));
-  else if (sortBy === 'station') list.sort((a, b) => (a.police_station || '').localeCompare(b.police_station || ''));
-  else list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  // Sort
+  if (sortBy === 'date_asc') allRecords.sort((a, b) => new Date(a.created_at||0) - new Date(b.created_at||0));
+  else if (sortBy === 'status') allRecords.sort((a, b) => (a.status||'').localeCompare(b.status||''));
+  else if (sortBy === 'station') allRecords.sort((a, b) => (a.police_station||'').localeCompare(b.police_station||''));
+  else allRecords.sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
 
-  if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:#a3b1cc;">No complaints match the active filters.</td></tr>';
+  if (allRecords.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color:#94a3b8;">No records found. Try clearing the filters.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = list.map(r => `
+  tbody.innerHTML = allRecords.map(r => `
     <tr>
-      <td><strong>${r.id}</strong></td>
+      <td><strong>${r.id || '—'}</strong><br><span style="font-size:10px; color:#94a3b8;">${r._module.label}</span></td>
       <td>${r.name || '—'}</td>
       <td>${r.mobile || '—'}</td>
-      <td>${r.district || '—'} / ${r.police_station || 'Unassigned'}</td>
-      <td>${r.category || 'Standard'}</td>
-      <td><span class="admin-badge ${getStatusClass(r.status)}">${r.status}</span></td>
+      <td>${r.district || '—'} / ${r.police_station || r.station || 'Unassigned'}</td>
+      <td>${r.category || r.type || r.scheme_title || r._module.label}</td>
+      <td><span class="admin-badge ${getStatusClass(r.status || 'Submitted')}">${r.status || 'Submitted'}</span></td>
       <td>${r.officer_seen_at ? '✅ Seen' : '⏳ Not seen'}</td>
       <td style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="admin-btn" style="padding:4px 8px; font-size:11px;" onclick="viewRecordFullDetail('complaints', '${r.id}')">👁️ View${r.video_url ? ' / 🔊' : ''}</button>
-        <button class="admin-btn" style="padding:4px 8px; font-size:11px;" onclick="openAdminActionModal('complaints', '${r.id}')">⚙️ Manage</button>
+        <button class="admin-btn" style="padding:4px 8px; font-size:11px;" onclick="viewRecordFullDetail('${r._module.table}', '${r.id}')">👁️ View${r.video_url ? ' 🔊' : ''}</button>
+        <button class="admin-btn" style="padding:4px 8px; font-size:11px;" onclick="downloadReceiptPDF('${r.id}')">🖨️ Print</button>
       </td>
     </tr>
   `).join('');
 };
 
-function populateComplaintFilterDropdowns(list, officersMap) {
+function populateComplaintFilterDropdowns(list) {
   const catSel = document.getElementById('compFilterCategory');
   const stationSel = document.getElementById('compFilterStation');
-  const officerSel = document.getElementById('compFilterOfficer');
   if (!catSel || catSel.dataset.populated) return;
 
-  const categories = [...new Set(list.map(r => r.category).filter(Boolean))];
-  const stations = [...new Set(list.map(r => r.police_station).filter(Boolean))];
-  const officers = {};
-  list.forEach(r => {
-    if (r.assigned_officer_id) {
-      const id = r.assigned_officer_id.id || r.assigned_officer_id;
-      const name = r.assigned_officer_id.name || officersMap[id];
-      if (id && name) officers[id] = name;
-    }
-  });
-
-  catSel.innerHTML = '<option value="">All Categories</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
-  stationSel.innerHTML = '<option value="">All Stations</option>' + stations.map(s => `<option value="${s}">${s}</option>`).join('');
-  officerSel.innerHTML = '<option value="">All Officers</option>' + Object.entries(officers).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+  const stations = [...new Set(list.map(r => r.police_station || r.station).filter(Boolean))];
+  catSel.innerHTML = '<option value="">All Categories / Modules</option>' +
+    ADMIN_REGISTRY_MODULES.map(m => `<option value="${m.table}">${m.label}</option>`).join('');
+  stationSel.innerHTML = '<option value="">All Stations</option>' +
+    stations.map(s => `<option value="${s}">${s}</option>`).join('');
+  // Remove officer filter if exists (not meaningful across all modules)
+  const officerSel = document.getElementById('compFilterOfficer');
+  if (officerSel) officerSel.innerHTML = '<option value="">All Officers</option>';
   catSel.dataset.populated = 'true';
 }
 
 window.exportComplaintsData = async function(format) {
-  let list = [];
+  let allRecords = [];
   if (isSupabaseConfigured) {
-    const { data } = await supabase.from('complaints').select('*');
-    list = data || [];
+    const results = await Promise.all(ADMIN_REGISTRY_MODULES.map(m => supabase.from(m.table).select('*')));
+    results.forEach((res, i) => {
+      (res.data || []).forEach(r => allRecords.push({ module: ADMIN_REGISTRY_MODULES[i].label, ...r }));
+    });
   } else {
-    list = JSON.parse(localStorage.getItem(MOCK_COMPLAINTS) || '[]');
+    ADMIN_REGISTRY_MODULES.forEach(m => {
+      JSON.parse(localStorage.getItem(m.key) || '[]').forEach(r => allRecords.push({ module: m.label, ...r }));
+    });
   }
-  if (list.length === 0) { showToast('No complaints to export.', 'warning'); return; }
+  if (allRecords.length === 0) { showToast('No records to export.', 'warning'); return; }
 
   if (format === 'json') {
-    const blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `complaints_export_${Date.now()}.json`; a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob([JSON.stringify(allRecords, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `registry_export_${Date.now()}.json`; a.click();
   } else {
-    const headers = ['id', 'name', 'mobile', 'district', 'police_station', 'category', 'status', 'created_at'];
+    const headers = ['module', 'id', 'name', 'mobile', 'district', 'police_station', 'status', 'created_at'];
     const csvRows = [headers.join(',')];
-    list.forEach(r => {
-      csvRows.push(headers.map(h => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','));
-    });
+    allRecords.forEach(r => csvRows.push(headers.map(h => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(',')));
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `complaints_export_${Date.now()}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `registry_export_${Date.now()}.csv`; a.click();
   }
-  showToast(`Exported ${list.length} complaints as ${format.toUpperCase()}.`, 'success');
+  showToast(`Exported ${allRecords.length} records as ${format.toUpperCase()}.`, 'success');
 };
 
 window.fetchARSAdmin = async function() {
@@ -4380,6 +4732,118 @@ window.deleteContact = async function(id) {
 // ==========================================
 // 16. EMERGENCY SOS DISTRESS LIVE QUEUE
 // ==========================================
+// ==========================================
+// SAFE TRAVEL MONITOR ADMIN
+// ==========================================
+window.fetchTravelMonitorAdmin = async function() {
+  const tbody = document.getElementById('travelTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:16px;">Loading...</td></tr>';
+
+  let list = [];
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('emergency_requests').select('*')
+      .in('type', ['Safe Travel Mode', 'Safe Travel SOS 🚨'])
+      .order('created_at', { ascending: false });
+    list = data || [];
+  } else {
+    list = JSON.parse(localStorage.getItem(MOCK_EMERGENCY_REQUESTS) || '[]')
+      .filter(r => r.type === 'Safe Travel Mode' || r.type === 'Safe Travel SOS 🚨')
+      .sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
+  }
+
+  // Show SOS alerts at top
+  const sosAlerts = list.filter(r => r.type === 'Safe Travel SOS 🚨' || r.status === 'SOS Triggered' || r.status === 'SOS ACTIVE');
+  const sosArea = document.getElementById('travelAdminSOSAlerts');
+  if (sosArea) {
+    if (sosAlerts.length === 0) {
+      sosArea.innerHTML = '';
+    } else {
+      sosArea.innerHTML = sosAlerts.map(r => {
+        const coordMatch = (r.location||'').match(/GPS:\s*([0-9.\-]+),\s*([0-9.\-]+)/);
+        const mapLink = coordMatch ? `<a href="https://maps.google.com/?q=${coordMatch[1]},${coordMatch[2]}" target="_blank" style="color:#fca5a5; font-weight:700;">📍 Open Live Location on Map</a> &nbsp;·&nbsp; <a href="https://www.google.com/maps/dir/?api=1&destination=${coordMatch[1]},${coordMatch[2]}" target="_blank" style="color:#fde68a; font-weight:700;">🧭 Get Directions</a>` : `<span style="color:#fca5a5;">GPS unavailable — Last known: ${r.location||'Unknown'}</span>`;
+        return `<div class="travel-sos-alert-card">
+          <div class="travel-sos-alert-header">🚨 SOS ALERT — ${r.name} (${r.mobile})</div>
+          <div class="travel-sos-alert-detail">
+            ${r.description || r.remarks || '—'}<br><br>
+            ${mapLink}
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="admin-btn primary" onclick="openAdminActionModal('emergency_requests','${r.id}')">⚡ Take Action Now</button>
+            <button class="admin-btn" onclick="viewRecordFullDetail('emergency_requests','${r.id}')">👁️ Full Details</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:#64748b;">No Safe Travel journeys filed yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => {
+    const routeMatch = (r.remarks||r.description||'').match(/Route (.+?) to (.+?) in /);
+    const start = routeMatch ? routeMatch[1] : r.location || '—';
+    const end = routeMatch ? routeMatch[2] : '—';
+    const plateMatch = (r.remarks||r.description||'').match(/\(([^)]+)\)/);
+    const plate = plateMatch ? plateMatch[1] : '—';
+    const transportMatch = (r.remarks||r.description||'').match(/ in (.+?) \(/);
+    const transport = transportMatch ? transportMatch[1] : '—';
+    const isSOS = r.type === 'Safe Travel SOS 🚨' || r.status === 'SOS ACTIVE' || r.status === 'SOS Triggered';
+    return `
+    <tr style="${isSOS ? 'background:#fff1f2; border-left:3px solid #dc2626;' : ''}">
+      <td><strong>${r.id}</strong>${isSOS ? ' <span style="color:#dc2626; font-weight:900; font-size:11px;">🚨SOS</span>' : ''}</td>
+      <td>${r.name || '—'}</td>
+      <td>${r.mobile || '—'}</td>
+      <td>${start} → ${end}</td>
+      <td>${transport} · ${plate}</td>
+      <td>${r.district || '—'}</td>
+      <td><span class="admin-badge ${getStatusClass(r.status||'Submitted')}">${r.status||'Submitted'}</span></td>
+      <td>${new Date(r.created_at||new Date()).toLocaleString()}</td>
+      <td style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="admin-btn ${isSOS ? 'danger' : 'primary'}" style="padding:4px 8px; font-size:11px;" onclick="showTravelLocationAdmin('${r.id}', '${(r.location||'').replace(/'/g,"\\'")}', '${start.replace(/'/g,"\\'")}', '${end.replace(/'/g,"\\'")}', '${r.name||''}', '${r.mobile||''}', '${transport}', '${plate}')">📍 ${isSOS ? 'LIVE LOCATION' : 'View'}</button>
+        ${isSOS ? `<button class="admin-btn" style="padding:4px 8px; font-size:11px;" onclick="openAdminActionModal('emergency_requests','${r.id}')">⚡ Act</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+};
+
+window.showTravelLocationAdmin = function(id, locationRaw, start, end, name, mobile, transport, plate) {
+  const mapArea = document.getElementById('travelAdminMapArea');
+  const detailEl = document.getElementById('travelSelectedDetail');
+  const mapEl = document.getElementById('travelLiveMapEmbed');
+  const linksEl = document.getElementById('travelDirectionLinks');
+  if (!mapArea || !mapEl) return;
+
+  mapArea.style.display = 'block';
+  mapArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Extract GPS coordinates from location string
+  const coordMatch = locationRaw.match(/GPS:\s*([0-9.\-]+),\s*([0-9.\-]+)/);
+
+  detailEl.innerHTML = `
+    <div class="record-detail-field"><label>Traveller</label><span>${name} · ${mobile}</span></div>
+    <div class="record-detail-field"><label>Route</label><span>${start} → ${end}</span></div>
+    <div class="record-detail-field"><label>Vehicle</label><span>${transport} · ${plate}</span></div>
+    <div class="record-detail-field"><label>Journey ID</label><span>${id}</span></div>
+  `;
+
+  if (coordMatch) {
+    const lat = coordMatch[1], lng = coordMatch[2];
+    mapEl.innerHTML = `<iframe class="travel-map-embed" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-.008},${parseFloat(lat)-.008},${parseFloat(lng)+.008},${parseFloat(lat)+.008}&marker=${lat},${lng}&layer=mapnik"></iframe>`;
+    linksEl.innerHTML = `
+      <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" class="admin-btn primary" style="text-decoration:none;">📍 Open on Google Maps</a>
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" class="admin-btn" style="text-decoration:none;">🧭 Navigate / Directions</a>
+    `;
+  } else {
+    // No GPS coords — show text-based map link
+    const query = encodeURIComponent(locationRaw || start);
+    mapEl.innerHTML = `<div style="background:#f1f5f9; border-radius:10px; padding:20px; text-align:center; color:#64748b;"><p>📍 Location: <strong>${locationRaw || start}</strong></p><p style="font-size:12px; margin-top:8px;">GPS coordinates not available. Citizen may have entered a text address.</p></div>`;
+    linksEl.innerHTML = `<a href="https://maps.google.com/maps?q=${query}" target="_blank" class="admin-btn primary" style="text-decoration:none;">🔍 Search Location on Maps</a>`;
+  }
+};
+
 window.fetchEmergencySOSAdmin = async function() {
   const tbody = document.getElementById('emergencyTableBody');
   if (!tbody) return;
@@ -4784,72 +5248,93 @@ function linkifyGpsMentions(text) {
 window.viewRecordFullDetail = async function(moduleTable, id) {
   const modal = document.getElementById('modalRecordDetail');
   const body = document.getElementById('recordDetailBody');
+  const heroId = document.getElementById('recordDetailHeroId');
+  const heroStatus = document.getElementById('recordDetailHeroStatus');
+  const heroModule = document.getElementById('recordDetailHeroModule');
   if (!modal || !body) return;
 
-  body.innerHTML = 'Loading record details...';
+  body.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">Loading details...</div>';
   modal.classList.add('open');
 
+  // Fetch record
   let record = null;
   if (isSupabaseConfigured) {
-    const { data } = await supabase.from(moduleTable).select('*').eq('id', id).single();
+    const { data } = await supabase.from(moduleTable).select('*, assigned_officer_id(name, designation, mobile)').eq('id', id).single();
     record = data;
   } else {
-    let key = '';
-    if (moduleTable === 'complaints') key = MOCK_COMPLAINTS;
-    else if (moduleTable === 'ars_reports') key = MOCK_ARS_REPORTS;
-    else if (moduleTable === 'mhd_requests') key = MOCK_MHD_REQUESTS;
-    else if (moduleTable === 'counselling_bookings') key = MOCK_COUNSELLING_BOOKINGS;
-    else if (moduleTable === 'empowerment_applications') key = MOCK_EMPOWERMENT_APPLICATIONS;
-    else if (moduleTable === 'emergency_requests') key = MOCK_EMERGENCY_REQUESTS;
-    record = JSON.parse(localStorage.getItem(key) || '[]').find(r => r.id === id);
+    const keyMap = { complaints: MOCK_COMPLAINTS, ars_reports: MOCK_ARS_REPORTS, mhd_requests: MOCK_MHD_REQUESTS, counselling_bookings: MOCK_COUNSELLING_BOOKINGS, emergency_requests: MOCK_EMERGENCY_REQUESTS, empowerment_applications: MOCK_EMPOWERMENT_APPLICATIONS, callback_requests: MOCK_CALLBACK_REQUESTS };
+    record = JSON.parse(localStorage.getItem(keyMap[moduleTable]) || '[]').find(r => r.id === id);
+  }
+  if (!record) { body.innerHTML = '<p style="color:#dc2626;">Record not found.</p>'; return; }
+
+  // Fetch history/timeline
+  let historyLogs = [];
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('module_history').select('*').eq('tracking_id', id).order('created_at', { ascending: false });
+    historyLogs = data || [];
+  } else {
+    historyLogs = JSON.parse(localStorage.getItem(MOCK_MODULE_HISTORY) || '[]').filter(h => h.tracking_id === id).reverse();
   }
 
-  if (!record) {
-    body.innerHTML = '<p style="color:#fca5a5;">Record not found.</p>';
-    return;
-  }
+  // Module label
+  const moduleLabels = { complaints:'📝 Complaint', ars_reports:'🚔 Anti-Romeo', mhd_requests:'👮 Help Desk', counselling_bookings:'💬 Counselling', emergency_requests:'🆘 SOS / Travel', empowerment_applications:'💪 JSS Program', callback_requests:'📞 Legal Aid' };
+  if (heroId) heroId.textContent = record.id;
+  if (heroStatus) heroStatus.textContent = record.status || 'Submitted';
+  if (heroModule) heroModule.textContent = moduleLabels[moduleTable] || moduleTable;
 
-  const rows = [
-    ['Reference ID', record.id],
-    ['Name', record.name || '—'],
-    ['Mobile', record.mobile || '—'],
-    ['Email', record.email || '—'],
-    ['District', record.district || '—'],
-    ['Police Station', record.police_station || record.station || '—'],
-    ['Category / Type', record.category || record.type || record.scheme_title || '—'],
-    ['Status', record.status || '—'],
-    ['Seen by Officer', record.officer_seen_at ? `✅ Yes — ${new Date(record.officer_seen_at).toLocaleString()}` : '⏳ Not seen yet'],
-    ['Filed On', new Date(record.created_at || new Date()).toLocaleString()]
-  ];
+  // Officer block
+  const officerData = record.assigned_officer_id;
+  const officerHtml = officerData && officerData.name ? `
+    <div class="record-detail-officer-box">
+      <div class="record-detail-officer-avatar">👮</div>
+      <div class="record-detail-officer-info">
+        <strong>👮 ${officerData.name}</strong>
+        <span>${officerData.designation || 'Assigned Officer'} · ${officerData.mobile || '—'}</span>
+        <span style="font-size:10.5px; color:#64748b;">Seen at: ${record.officer_seen_at ? new Date(record.officer_seen_at).toLocaleString() : 'Not yet seen'}</span>
+      </div>
+    </div>` : record.officer_seen_at ? `<div class="record-detail-officer-box"><div class="record-detail-officer-avatar">👮</div><div class="record-detail-officer-info"><strong>Officer assigned</strong><span>Seen: ${new Date(record.officer_seen_at).toLocaleString()}</span></div></div>` : '';
 
-  let locationHtml = '';
-  if (record.location) {
-    locationHtml = `<div class="active-ticket-detail-row"><strong>Location:</strong> <span>${linkifyGpsMentions(record.location)}</span></div>`;
-  }
+  // Location
+  const locHtml = record.location ? `<div class="record-detail-field full"><label>📍 Location</label><span>${linkifyGpsMentions(record.location)}</span></div>` : '';
 
-  let rowsHtml = rows.map(([label, val]) => `<div class="active-ticket-detail-row"><strong>${label}:</strong> <span>${val}</span></div>`).join('');
+  // Description
+  const rawDesc = record.description || record.reason || record.remarks || '';
+  const descHtml = rawDesc ? `<div class="record-detail-desc-box"><div class="record-detail-desc-label">📝 Full Description / Complaint Text</div><div class="record-detail-desc-text">${linkifyGpsMentions(rawDesc.replace(/</g,'&lt;'))}</div></div>` : '';
 
-  let descHtml = '';
-  if (record.description || record.reason || record.remarks) {
-    const rawDesc = (record.description || record.reason || record.remarks || '').replace(/</g,'&lt;');
-    descHtml = `<div style="margin-top:12px; background:rgba(255,255,255,0.05); border-radius:8px; padding:12px;">
-      <strong style="display:block; margin-bottom:6px; color:#f9a8d4;">📝 Full Description / Complaint Text:</strong>
-      <div style="white-space:pre-wrap;">${linkifyGpsMentions(rawDesc)}</div>
-    </div>`;
-  }
+  // Timeline
+  const chronoLogs = [...historyLogs].reverse();
+  const timelineHtml = `<div class="record-detail-progress"><div class="record-detail-progress-title">📊 Case Progress Timeline</div><div class="record-detail-timeline">${
+    chronoLogs.length === 0
+      ? `<div class="record-detail-step"><div class="record-detail-step-dot">📝</div><div class="record-detail-step-title">Submitted</div><div class="record-detail-step-time">${new Date(record.created_at||new Date()).toLocaleString()}</div></div>`
+      : chronoLogs.map(log => {
+          const icon = /resolved|closed|completed/i.test(log.status||'') ? '✅' : /assign/i.test(log.status||'') ? '👮' : /investigat|progress/i.test(log.status||'') ? '🔎' : '📝';
+          const done = /resolved|closed|completed/i.test(log.status||'');
+          return `<div class="record-detail-step"><div class="record-detail-step-dot ${done ? 'done' : ''}">${icon}</div><div class="record-detail-step-title">${log.status}</div><div class="record-detail-step-time">${new Date(log.created_at).toLocaleString()}${log.officer_name ? ' · ' + log.officer_name : ''}</div>${log.remarks ? `<div class="record-detail-step-remark">${log.remarks}</div>` : ''}</div>`;
+        }).join('')
+  }</div></div>`;
 
-  let audioHtml = '';
-  if (record.video_url) {
-    audioHtml = `<div style="margin-top:12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:12px;">
-      <strong style="display:block; margin-bottom:8px; color:#38bdf8;">🔊 Citizen's Original Voice Recording:</strong>
-      <audio controls style="width:100%;" src="${record.video_url}">Your browser does not support audio playback.</audio>
-    </div>`;
-  }
+  // Audio
+  const audioHtml = record.video_url ? `<div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:12px;"><div style="font-size:11px; font-weight:700; color:#1e3a8a; margin-bottom:8px;">🔊 Citizen's Voice Recording</div><audio controls style="width:100%;" src="${record.video_url}"></audio></div>` : '';
 
-  let printHtml = `<div style="margin-top:16px;"><button class="admin-btn primary" onclick="downloadReceiptPDF('${record.id}')">🖨️ Print / Download PDF</button></div>`;
-
-
-  body.innerHTML = rowsHtml + locationHtml + descHtml + audioHtml + printHtml;
+  body.innerHTML = `
+    <div class="record-detail-grid">
+      <div class="record-detail-field"><label>Name</label><span>${record.name || '—'}</span></div>
+      <div class="record-detail-field"><label>Mobile</label><span>${record.mobile || '—'}</span></div>
+      <div class="record-detail-field"><label>District</label><span>${record.district || '—'}</span></div>
+      <div class="record-detail-field"><label>Police Station</label><span>${record.police_station || record.station || '—'}</span></div>
+      <div class="record-detail-field"><label>Category / Type</label><span>${record.category || record.type || record.scheme_title || '—'}</span></div>
+      <div class="record-detail-field"><label>Filed On</label><span>${new Date(record.created_at||new Date()).toLocaleString()}</span></div>
+      ${locHtml}
+    </div>
+    ${officerHtml}
+    ${descHtml}
+    ${audioHtml}
+    ${timelineHtml}
+    <div class="record-detail-print-row">
+      <button class="admin-btn primary" onclick="downloadReceiptPDF('${record.id}')">🖨️ Print / PDF</button>
+      <button class="admin-btn" onclick="closeModal('modalRecordDetail')">✕ Close</button>
+    </div>
+  `;
 };
 
 window.exportMasterReportCSV = async function() {
@@ -4895,38 +5380,54 @@ window.exportMasterReportCSV = async function() {
 // ==========================================
 function subscribeRealtimeEventsAdmin() {
   if (!isSupabaseConfigured) return;
-  
-  // Realtime updates for admin dashboard queues
-  supabase.channel('admin-db-changes')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public' }, payload => {
-      showToast(`New incoming ${payload.table} report received!`, 'warning');
-      reloadAdminView();
-    })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
-      reloadAdminView();
-    })
-    .subscribe();
+
+  const trackedTables = ['complaints', 'ars_reports', 'mhd_requests', 'counselling_bookings', 'emergency_requests', 'callback_requests'];
+  let channel = supabase.channel('admin-db-changes');
+
+  trackedTables.forEach(table => {
+    channel = channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table }, payload => {
+        showToast(`New incoming ${table} report received!`, 'warning');
+        reloadAdminView();
+        fetchAdminNotifications();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table }, payload => {
+        reloadAdminView();
+      });
+  });
+
+  channel.subscribe();
 }
 
 function subscribeRealtimeEventsUser() {
   if (!isSupabaseConfigured || !currentSessionUser) return;
-  
-  // Realtime updates for user timeline & notifications
-  supabase.channel('user-db-changes')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public' }, payload => {
+
+  const trackedTables = ['complaints', 'ars_reports', 'mhd_requests', 'counselling_bookings', 'emergency_requests', 'callback_requests'];
+  let channel = supabase.channel('user-db-changes');
+
+  trackedTables.forEach(table => {
+    channel = channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table }, payload => {
       if (payload.new && payload.new.email === currentSessionUser.email) {
         showToast(`Case reference ${payload.new.id} status updated to: ${payload.new.status}`, 'success');
         fetchUserDashboardData();
         fetchUserNotifications();
+        // If the citizen currently has this exact record's tracking panel open, refresh it live
+        const trackInput = document.getElementById('trackInputId');
+        if (trackInput && trackInput.value.trim() === payload.new.id) {
+          trackRequestById();
+        }
       }
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
-      if (payload.new && payload.new.user_email === currentSessionUser.email) {
-        showToast(`Alert Notification: ${payload.new.title}`, 'info');
-        fetchUserNotifications();
-      }
-    })
-    .subscribe();
+    });
+  });
+
+  channel = channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
+    if (payload.new && payload.new.user_email === currentSessionUser.email) {
+      showToast(`Alert Notification: ${payload.new.title}`, 'info');
+      fetchUserNotifications();
+    }
+  });
+
+  channel.subscribe();
 }
 
 
@@ -5831,6 +6332,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await seedDatabaseIfNeeded();
   }
   initMobileUx();
+  // Sync translator bar button states from saved language
+  const savedLang = localStorage.getItem('shaktiLang') || 'en';
+  const enBtn = document.getElementById('transEnBtn');
+  const hiBtn = document.getElementById('transHiBtn');
+  if (enBtn) enBtn.classList.toggle('active', savedLang === 'en');
+  if (hiBtn) hiBtn.classList.toggle('active', savedLang === 'hi');
   applyLanguage();
   switchTab('shakti');
 });
